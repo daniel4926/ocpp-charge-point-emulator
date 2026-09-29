@@ -28,4 +28,14 @@ Un simulador ligero, de un solo archivo (Single-File) y basado en navegador para
 - Conexión a internet (para cargar la librería jQuery desde su CDN).
 - Un servidor OCPP 1.6 (CSMS) local o remoto para establecer la conexión.
 
+## Configuración Simulada
+El simulador mantiene un estado en memoria para responder a peticiones GetConfiguration del servidor. Soporta la lectura y escritura (mediante ChangeConfiguration) de variables estándar como:
+
+- HeartbeatInterval
+- ConnectionTimeOut
+- MeterValueSampleInterval
+
+## Contribuciones
+Las contribuciones son bienvenidas. Si deseas agregar soporte para nuevos mensajes del protocolo OCPP 1.6 (como Smart Charging, Firmware Management o Local Auth List), siéntete libre de hacer un Fork del repositorio y enviar un Pull Request.
+
 

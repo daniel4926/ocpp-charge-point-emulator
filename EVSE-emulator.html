@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>OCPP Simulator v1.0</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #00bcd4;
+            --success-color: #4caf50;
+            --warning-color: #ff9800;
+            --danger-color: #f44336;
+        }
+
+        body {
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            background: var(--panel-color);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .brand {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--accent-color);
+            letter-spacing: 2px;
+        }
+
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            background: #333;
+            color: #aaa;
+        }
+
+        /* Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .controls-panel {
+            width: 350px;
+            background: var(--panel-color);
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .console-panel {
+            flex: 1;
+            background: #000;
+            padding: 10px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Form Elements */
+        label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        input, select {
+            background: #2c2c2c;
+            border: 1px solid #444;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 5px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        button {
+            background: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.2s;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        button:hover { opacity: 0.9; }
+        button.secondary { background: #444; color: white; }
+        button.danger { background: var(--danger-color); color: white; }
+        button.success { background: var(--success-color); color: white; }
+
+        .group-box {
+            border: 1px solid #333;
+            padding: 10px;
+            border-radius: 5px;
+            background: #181818;
+        }
+        .group-title {
+            font-size: 12px;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        /* Console Logs */
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-bottom: 1px solid #222;
+            font-size: 13px;
+        }
+        .log-in { color: var(--success-color); } /* Recibido */
+        .log-out { color: var(--accent-color); } /* Enviado */
+        .log-sys { color: var(--warning-color); } /* Sistema */
+        .log-err { color: var(--danger-color); } /* Error */
+
+        pre { margin: 5px 0 0 0; color: #bbb; font-size: 11px; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="brand">INFINITY <span style="font-size:12px; color:#666">SIMULATOR v2.0</span></div>
+        <div id="connectionStatus" class="status-badge">DESCONECTADO</div>
+    </header>
+
+    <div class="main-container">
+        <div class="controls-panel">
+            
+            <div class="group-box">
+                <div class="group-title">Conexión</div>
+                <label>Central System URL</label>
+                <input id="CP" type="text" value="ws://localhost:8053/ocpp1_6/2Y9uevVORr2O7OdrjeHIuR" />
+                <label>Charge Point ID (Identity)</label>
+                <input id="CPID" type="text" placeholder="Autodetectado de URL si vacío" />
+                <button id="connect" class="success">Conectar</button>
+            </div>
+
+            <div class="group-box">
+                <div class="group-title">Operaciones</div>
+                <label>ID Tag (RFID)</label>
+                <input id="TAG" type="text" value="04B0267AE05C87" />
+                
+                <div style="display:flex; gap:5px;">
+                    <button id="send_auth" class="secondary">Autorizar</button>
+                    <button id="heartbeat" class="secondary">Heartbeat</button>
+                </div>
+                
+                <hr style="border-color:#333">
+                
+                <label>Transaction ID</label>
+                <input id="transactionId" type="text" value="0" readonly style="background:#222; color:#888"/>
+                
+                <button id="start">Iniciar Transacción</button>
+                <button id="stop" class="danger">Detener Transacción</button>
+            </div>
+
+            <div class="group-box">
+                <div class="group-title">Medidor (MeterValues)</div>
+                <div style="display: flex; gap: 5px;">
+                    <div style="flex:1">
+                        <label>Valor (Wh)</label>
+                        <input id="metervalue" type="number" value="0" />
+                    </div>
+                    <div style="flex:1">
+                        <label>Inc</label>
+                        <input id="meterIncrement" type="number" value="10" />
+                    </div>
+                </div>
+                <button id="mv">Enviar Valor Único</button>
+                <button id="mvp" class="secondary">Simular Carga (Loop)</button>
+            </div>
+
+            <div class="group-box">
+                <div class="group-title">Estado</div>
+                <select id="ConnectorStatus">
+                    <option value="Available">Available</option>
+                    <option value="Preparing">Preparing</option>
+                    <option value="Charging">Charging</option>
+                    <option value="SuspendedEV">SuspendedEV</option>
+                    <option value="Finishing">Finishing</option>
+                    <option value="Faulted">Faulted</option>
+                </select>
+                <button id="status" class="secondary">Enviar StatusNotification</button>
+            </div>
+            
+            <button onclick="$('#console').empty()" class="secondary" style="margin-top:auto">Limpiar Consola</button>
+        </div>
+
+        <div class="console-panel">
+            <div id="console"></div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        let _websocket = null;
+        let _msgId = 1;
+        let _connectorId = 1;
+        let _meterLoop = null;
+        
+        // Simulación de configuración interna del cargador
+        let _configuration = {
+            "HeartbeatInterval": "300",
+            "ConnectionTimeOut": "60",
+            "MeterValueSampleInterval": "60"
+        };
+
+        function getMsgId() {
+            return String(_msgId++);
+        }
+
+        // UI Helpers
+        function setStatus(state) {
+            const el = $("#connectionStatus");
+            switch (state) {
+                case "CONNECTED":
+                    el.css("background", "#4caf50").css("color", "white").text("CONECTADO");
+                    $("#connect").text("Desconectar").removeClass("success").addClass("danger");
+                    break;
+                case "CONNECTING":
+                    el.css("background", "#ff9800").css("color", "black").text("CONECTANDO...");
+                    break;
+                case "DISCONNECTED":
+                    el.css("background", "#333").css("color", "#aaa").text("DESCONECTADO");
+                    $("#connect").text("Conectar").removeClass("danger").addClass("success");
+                    break;
+                case "ERROR":
+                    el.css("background", "#f44336").css("color", "white").text("ERROR");
+                    break;
+            }
+        }
+
+        function log(type, action, msg) {
+            const time = new Date().toLocaleTimeString();
+            let colorClass = "log-sys";
+            let icon = "⚙️";
+            
+            if (type === "OUT") { colorClass = "log-out"; icon = "⬆️"; }
+            if (type === "IN") { colorClass = "log-in"; icon = "⬇️"; }
+            if (type === "ERR") { colorClass = "log-err"; icon = "❌"; }
+
+            const prettyMsg = (typeof msg === 'object') ? JSON.stringify(msg, null, 2) : msg;
+            
+            const html = `
+                <div class="log-entry">
+                    <span style="opacity:0.5">[${time}]</span> 
+                    <strong class="${colorClass}">${icon} ${action}</strong>
+                    <pre>${prettyMsg}</pre>
+                </div>`;
+            
+            const consoleDiv = $("#console");
+            consoleDiv.append(html);
+            consoleDiv.scrollTop(consoleDiv[0].scrollHeight);
+        }
+
+        // WebSocket Core
+        function wsConnect() {
+            const url = $("#CP").val();
+            
+            if (_websocket) {
+                _websocket.close();
+                return;
+            }
+
+            setStatus("CONNECTING");
+            
+            // Intentar extraer el ID de la URL si el campo está vacío
+            let identity = $("#CPID").val();
+            if(!identity){
+                const parts = url.split('/');
+                identity = parts[parts.length -1];
+                $("#CPID").val(identity);
+            }
+
+            try {
+                _websocket = new WebSocket(url, "ocpp1.6");
+            } catch (err) {
+                log("ERR", "Conexión", "URL Inválida");
+                setStatus("ERROR");
+                return;
+            }
+
+            _websocket.onopen = function () {
+                setStatus("CONNECTED");
+                log("SYS", "WebSocket", "Conexión Abierta");
+                sendBootNotification();
+            };
+
+            _websocket.onmessage = function (evt) {
+                const data = JSON.parse(evt.data);
+                handleIncomingMessage(data);
+            };
+
+            _websocket.onclose = function () {
+                setStatus("DISCONNECTED");
+                log("SYS", "WebSocket", "Conexión Cerrada");
+                _websocket = null;
+                clearInterval(_meterLoop);
+            };
+
+            _websocket.onerror = function (evt) {
+                setStatus("ERROR");
+                log("ERR", "WebSocket", evt);
+            };
+        }
+
+        // Manejo de Mensajes Entrantes (From Central System)
+        function handleIncomingMessage(data) {
+            const msgType = data[0];
+            
+            // CALLRESULT (Respuesta del Servidor a una petición nuestra)
+            if (msgType === 3) {
+                const msgId = data[1];
+                const payload = data[2];
+                log("IN", `Respuesta [${msgId}]`, payload);
+                
+                // Lógica específica al recibir respuestas
+                if(payload.transactionId) {
+                    $("#transactionId").val(payload.transactionId);
+                    $("#ConnectorStatus").val("Charging").change(); // Auto cambiar UI
+                }
+            } 
+            // CALL (Petición del Servidor hacia nosotros)
+            else if (msgType === 2) {
+                const msgId = data[1];
+                const action = data[2];
+                const payload = data[3];
+                
+                log("IN", action, payload);
+                handleServerRequest(msgId, action, payload);
+            }
+            // CALLERROR
+            else if (msgType === 4) {
+                log("ERR", "Error del Servidor", data);
+            }
+        }
+
+        // Router de Peticiones del Servidor
+        function handleServerRequest(msgId, action, payload) {
+            let responsePayload = {};
+            
+            switch (action) {
+                case "Reset":
+                    // Simular reinicio
+                    responsePayload = { status: "Accepted" };
+                    setTimeout(() => location.reload(), 2000);
+                    break;
+                
+                case "RemoteStopTransaction":
+                    // Validar si la transacción existe
+                    if(payload.transactionId == $("#transactionId").val()){
+                        responsePayload = { status: "Accepted" };
+                        // Simular que el cargador obedece y para la carga
+                        setTimeout(() => stopTransaction(true), 500); 
+                    } else {
+                        responsePayload = { status: "Rejected" };
+                    }
+                    break;
+
+                case "RemoteStartTransaction":
+                    // Iniciar carga remotamente
+                    responsePayload = { status: "Accepted" };
+                    $("#TAG").val(payload.idTag); // Usar el tag que envía el servidor
+                    setTimeout(() => startTransaction(), 500);
+                    break;
+
+                case "UnlockConnector":
+                    responsePayload = { status: "Unlocked" };
+                    break;
+
+                case "GetConfiguration":
+                    // Responder con las claves solicitadas o todas si está vacío
+                    let resultKeys = [];
+                    if(payload.key && payload.key.length > 0){
+                        payload.key.forEach(k => {
+                            if(_configuration[k]) resultKeys.push({key: k, readonly: false, value: _configuration[k]});
+                        });
+                    } else {
+                        // Devolver todo
+                         for (const [key, value] of Object.entries(_configuration)) {
+                             resultKeys.push({key: key, readonly: false, value: value});
+                         }
+                    }
+                    responsePayload = { configurationKey: resultKeys };
+                    break;
+
+                case "ChangeConfiguration":
+                    // Cambiar configuración en memoria
+                    _configuration[payload.key] = payload.value;
+                    responsePayload = { status: "Accepted" };
+                    // Si cambian el heartbeat, deberíamos reiniciar el timer (pendiente de implementar lógica real)
+                    break;
+                
+                case "TriggerMessage":
+                    responsePayload = { status: "Accepted" };
+                    if(payload.requestedMessage === "MeterValues") sendMeterValue();
+                    if(payload.requestedMessage === "StatusNotification") sendStatusNotification();
+                    if(payload.requestedMessage === "Heartbeat") sendHeartbeat();
+                    break;
+
+                default:
+                    responsePayload = { status: "NotSupported" }; // O error
+                    break;
+            }
+
+            // Enviar respuesta
+            const response = JSON.stringify([3, msgId, responsePayload]);
+            _websocket.send(response);
+            log("OUT", `Respuesta a ${action}`, responsePayload);
+        }
+
+        // Acciones OCPP (Cliente -> Servidor)
+
+        function sendBootNotification() {
+            const payload = {
+                chargePointVendor: "SkySim",
+                chargePointModel: "VirtualStation",
+                chargePointSerialNumber: "SKY-001",
+                firmwareVersion: "2.0.0",
+                iccid: "8900000000001",
+                imsi: "2000000000001",
+                meterType: "VirtualMeter",
+                meterSerialNumber: "M-001"
+            };
+            sendOCPP("BootNotification", payload);
+        }
+
+        function sendHeartbeat() {
+            sendOCPP("Heartbeat", {});
+        }
+
+        function sendAuthorize() {
+            const tag = $("#TAG").val();
+            sendOCPP("Authorize", { idTag: tag });
+        }
+
+        function startTransaction() {
+            // Lógica UI
+            $("#ConnectorStatus").val("Preparing").change(); // Primero Preparing
+            sendStatusNotification().then(() => {
+                const tag = $("#TAG").val();
+                const payload = {
+                    connectorId: _connectorId,
+                    idTag: tag,
+                    timestamp: new Date().toISOString(),
+                    meterStart: parseInt($("#metervalue").val()),
+                    reservationId: 0
+                };
+                sendOCPP("StartTransaction", payload);
+                // La UI cambiará a 'Charging' cuando llegue la respuesta con TransactionId
+            });
+        }
+
+        function stopTransaction(isRemote = false) {
+            const tid = $("#transactionId").val();
+            if(tid == 0 && !isRemote) { log("SYS", "Info", "No hay transacción activa"); return; }
+
+            const payload = {
+                transactionId: parseInt(tid),
+                idTag: $("#TAG").val(),
+                timestamp: new Date().toISOString(),
+                meterStop: parseInt($("#metervalue").val()),
+                reason: isRemote ? "Remote" : "Local"
+            };
+            
+            sendOCPP("StopTransaction", payload);
+            
+            // Reset UI
+            $("#transactionId").val(0);
+            $("#ConnectorStatus").val("Finishing").change();
+            
+            // Parar loop de medidor si existe
+            if(_meterLoop) {
+                clearInterval(_meterLoop);
+                _meterLoop = null;
+                $("#mvp").text("Simular Carga (Loop)").removeClass("danger").addClass("secondary");
+            }
+
+            setTimeout(() => {
+                $("#ConnectorStatus").val("Available").change();
+            }, 2000);
+        }
+
+        function sendMeterValue() {
+            const val = parseInt($("#metervalue").val());
+            const tid = parseInt($("#transactionId").val());
+            
+            const payload = {
+                connectorId: _connectorId,
+                transactionId: tid, 
+                meterValue: [{
+                    timestamp: new Date().toISOString(),
+                    sampledValue: [
+                        { value: String(val), context: "Sample.Periodic", format: "Raw", measurand: "Energy.Active.Import.Register", unit: "Wh" },
+                        { value: "220", context: "Sample.Periodic", format: "Raw", measurand: "Voltage", unit: "V" },
+                        { value: "10", context: "Sample.Periodic", format: "Raw", measurand: "Current.Import", unit: "A" }
+                    ]
+                }]
+            };
+            sendOCPP("MeterValues", payload);
+        }
+
+        function sendStatusNotification() {
+            return new Promise((resolve) => {
+                const status = $("#ConnectorStatus").val();
+                const payload = {
+                    connectorId: _connectorId,
+                    errorCode: "NoError",
+                    status: status,
+                    timestamp: new Date().toISOString()
+                };
+                sendOCPP("StatusNotification", payload);
+                setTimeout(resolve, 100); 
+            });
+        }
+
+        function toggleMeterLoop() {
+            if(_meterLoop) {
+                clearInterval(_meterLoop);
+                _meterLoop = null;
+                $("#mvp").text("Simular Carga (Loop)").removeClass("danger").addClass("secondary");
+            } else {
+                const interval = parseInt(_configuration.MeterValueSampleInterval) * 1000 || 5000;
+                // Forzamos 5 segs para pruebas visuales
+                
+                $("#mvp").text("Detener Loop").removeClass("secondary").addClass("danger");
+                
+                _meterLoop = setInterval(() => {
+                    let current = parseInt($("#metervalue").val());
+                    let inc = parseInt($("#meterIncrement").val());
+                    $("#metervalue").val(current + inc);
+                    sendMeterValue();
+                }, 5000);
+            }
+        }
+
+        // Función genérica de envío
+        function sendOCPP(action, payload) {
+            if (!_websocket || _websocket.readyState !== WebSocket.OPEN) {
+                log("ERR", "Sistema", "No hay conexión WebSocket");
+                return;
+            }
+            const id = getMsgId();
+            const msg = JSON.stringify([2, id, action, payload]);
+            _websocket.send(msg);
+            log("OUT", action, payload);
+        }
+
+        // Event Listeners jQuery
+        $(document).ready(function () {$("#connect").click(wsConnect);
+            $("#send_auth").click(sendAuthorize);
+            $("#heartbeat").click(sendHeartbeat);
+            $("#start").click(startTransaction);
+            $("#stop").click(() => stopTransaction(false));
+            $("#mv").click(sendMeterValue);
+            $("#mvp").click(toggleMeterLoop);
+            
+            $("#ConnectorStatus").change(function() {
+                // Al cambiar el select manualmente, enviamos notificación
+                sendStatusNotification();
+            });
+        });
+
+    </script>
+</body>
+</html>
